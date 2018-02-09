@@ -41,6 +41,52 @@ NONSEMANTIC_TOKENS = frozenset(['DEDENT', 'INDENT', 'NEWLINE', 'ENDMARKER'])
 OPENING_BRACKETS = frozenset({'(', '[', '{'})
 CLOSING_BRACKETS = frozenset({')', ']', '}'})
 
+from lib2to3.pgen2 import tokenize
+import re
+tokenize.Triple = tokenize.group("[ubUB]?[rR]?'''", '[ubUB]?[rR]?"""',
+                                 "[rR]?[fF]?'''", '[fF]?[rR]?"""')
+tokenize.String = tokenize.group(r"[uU]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*'",
+                                 r'[uU]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*"',
+                                 r"[fF]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*'",
+                                 r"[rR]?[fF]?'[^\n'\\]*(?:\\.[^\n'\\]*)*'",
+                                 r'[fF]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*"',
+                                 r'[rR]?[fF]?"[^\n"\\]*(?:\\.[^\n"\\]*)*"')
+tokenize.ContStr = tokenize.group(
+    r"[uUbB]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*" + tokenize.group(
+        "'", r'\\\r?\n'), r'[uUbB]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*' +
+    tokenize.group('"', r'\\\r?\n'),
+    r"[fF]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*" + tokenize.group("'", r'\\\r?\n'),
+    r"[rR]?[fF]?'[^\n'\\]*(?:\\.[^\n'\\]*)*" + tokenize.group("'", r'\\\r?\n'),
+    r'[fF]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*' + tokenize.group('"', r'\\\r?\n'),
+    r'[rR]?[fF]?"[^\n"\\]*(?:\\.[^\n"\\]*)*' + tokenize.group('"', r'\\\r?\n'))
+tokenize.PlainToken = tokenize.group(tokenize.Number, tokenize.Funny,
+                                     tokenize.String, tokenize.Name)
+tokenize.Token = tokenize.Ignore + tokenize.PlainToken
+tokenize.PseudoExtras = tokenize.group(r'\\\r?\n', tokenize.Comment,
+                                       tokenize.Triple)
+tokenize.PseudoToken = tokenize.Whitespace + tokenize.group(
+    tokenize.PseudoExtras, tokenize.Number, tokenize.Funny, tokenize.ContStr,
+    tokenize.Name)
+
+(tokenize.tokenprog, tokenize.pseudoprog, tokenize.single3prog,
+ tokenize.double3prog) = list(
+     map(re.compile, (tokenize.Token, tokenize.PseudoToken, tokenize.Single3,
+                      tokenize.Double3)))
+
+tokenize.endprogs.update({'f': None, 'F': None})
+
+for t in ('f', 'F', 'fr', 'rf', 'Fr', 'rF', 'fR', 'Rf', 'FR', 'RF'):
+  tt = f'{t}"""'
+  tokenize.endprogs[tt] = tokenize.double3prog
+  tokenize.triple_quoted[tt] = tt
+  tt = f"{t}'''"
+  tokenize.endprogs[tt] = tokenize.single3prog
+  tokenize.triple_quoted[tt] = tt
+  tt = f'{t}"'
+  tokenize.single_quoted[tt] = tt
+  tt = f"{t}'"
+  tokenize.single_quoted[tt] = tt
+
 
 class Annotation(object):
   """Annotation names associated with pytrees."""
